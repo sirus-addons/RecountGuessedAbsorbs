@@ -211,12 +211,15 @@ local AbsorbSpellDuration =
 	[67259] = 15, -- 700000
 	[67261] = 15, -- 1200000
 
+	[304685] = 10, -- Warrior, T4
+	[310210] = 2, -- Warrior, T5
 	[304736] = 10, -- Priest, Divine Charm (T4), T4
 	[305082] = 30, -- Priest, Power Word: Shield (T4), T4
 	[308143] = 30, -- Priest, Power Word: Shield, Rank 15, T5
 	[307921] = 30, -- Paladin, Holy Barrier, T5
 	[308125] = 10, -- Death Knight, Ice Armor, T5
-	[308159] = 10, -- Live Barrier, Trinket
+	[308136] = 20, -- Death Knight, Blood Shield, T5
+	[313530] = 12, -- Iron Heart, Trinket
 }
 
 
