@@ -220,6 +220,7 @@ local AbsorbSpellDuration =
 	[308125] = 10, -- Death Knight, Ice Armor, T5
 	[308136] = 20, -- Death Knight, Blood Shield, T5
 	[313530] = 12, -- Iron Heart, Trinket
+	[316282] = 2, -- Wave of Light (Racial)
 }
 
 
