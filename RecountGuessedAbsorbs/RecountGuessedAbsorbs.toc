@@ -1,6 +1,6 @@
 ﻿## Interface: 30300
 ## Title: RecountGuessedAbsorbs
-## Notes: |@Version: 2@|A guessed absorbs main view module for Recount
+## Notes: |@Version: 3@|A guessed absorbs main view module for Recount
 ## Author: Elsia
 ## RequiredDeps: Recount
 ## OptionalDeps: Ace3, Recount
