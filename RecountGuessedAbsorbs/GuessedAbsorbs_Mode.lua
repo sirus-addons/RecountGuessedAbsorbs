@@ -5,6 +5,7 @@
 ]]
 
 if not Recount then return end --  Forget about this if no Recount is present
+if Recount.AbsorbSpellDuration then return end
 
 local Recount = Recount
 
@@ -52,6 +53,7 @@ DetailTitles.ShieldDamagedBy={
 
 -- Biffur: Keep track of active shields on each target
 local AllShields={}
+local ShieldNames={}
 local Epsilon=0.000000000000000001
 
 
@@ -221,6 +223,8 @@ local AbsorbSpellDuration =
 	[308136] = 20, -- Death Knight, Blood Shield, T5
 	[313530] = 12, -- Iron Heart, Trinket
 	[316282] = 2, -- Wave of Light (Racial)
+	[319166] = 30,
+	[374840] = 10,
 }
 
 
@@ -270,7 +274,7 @@ end
 function RecountGuessedAbsorbs:SpellAuraApplied(timestamp, eventtype, srcGUID, srcName, srcFlags, dstGUID, dstName, dstFlags,spellId, spellName, spellSchool, auraType)
 
 	-- Is this an absorb effect?
-	if AbsorbSpellDuration[spellId] then
+	if AbsorbSpellDuration[spellId] and spellName then
 		-- Yes? Add shield
 		AllShields[dstName] = AllShields[dstName] or {}
 		Recount:DPrint("Assigning active " .. spellName .." on " .. dstName .." cast by " ..srcName)
@@ -279,12 +283,13 @@ function RecountGuessedAbsorbs:SpellAuraApplied(timestamp, eventtype, srcGUID, s
 			Recount:DPrint("Valid shield is being rewritten without having been removed first: "..srcName.." "..dstName.." "..spellName)
 		end
 		AllShields[dstName][spellId][srcName] = timestamp + AbsorbSpellDuration[spellId]
+		ShieldNames[spellId] = spellName
 		
 		if not Recount.db2.combatants[srcName]  then
 			Recount:DPrint("No source combatant!")
 		else
 			local sourceData=Recount.db2.combatants[srcName]
-			Recount:AddTableDataSum(sourceData,"ShieldedWho",dstName,spellName,1)
+			Recount:AddTableDataSum(sourceData,"GuessedShieldedWho",dstName,spellName,1)
 		end
 
 	end
@@ -293,7 +298,7 @@ end
 function RecountGuessedAbsorbs:SpellAuraRemoved(timestamp, eventtype, srcGUID, srcName, srcFlags, dstGUID, dstName, dstFlags,spellId, spellName, spellSchool, auraType)
 
 	-- Is this an absorb effect?
-	if AbsorbSpellDuration[spellId] then
+	if AbsorbSpellDuration[spellId] and spellName then
 		-- Yes? Lets remove it if it was tracked
 		if AllShields[dstName] and AllShields[dstName][spellId] and AllShields[dstName][spellId][srcName] then
 			if AllShields[dstName][spellId][srcName] >= timestamp then
@@ -398,6 +403,9 @@ end
 
 
 function RecountGuessedAbsorbs:AddAbsorbData(source, victim, ability, element, hittype, damage, resist, srcGUID, srcFlags, dstGUID, dstFlags, spellId, blocked, absorbed, timestamp)
+	if not Recount.InCombat and Recount.db.profile.RecordCombatOnly and (Recount:IsFriendlyFire(srcFlags,dstFlags) or not (Recount:InGroup(srcFlags) or Recount:InGroup(dstFlags))) then
+		return
+	end
 
 	local shieldref = AllShields[victim]
 	local currenttime = timestamp
@@ -430,7 +438,7 @@ function RecountGuessedAbsorbs:AddAbsorbData(source, victim, ability, element, h
 		Recount:DPrint("Failed to find a minsource for absorb on "..victim.." "..absorbed)
 	else
 		local damagesrc = source
-		local spellName = GetSpellInfo(minspell)
+		local spellName = ShieldNames[minspell]
 		local source = minsrc
 		Recount:DPrint("Guessing that the absorb goes to "..minsrc.." having used spell "..minspell ..":"..absorbed)
 		if not Recount.db2.combatants[source] then
@@ -459,7 +467,7 @@ end
 
 -- global OnDisable
 function RecountGuessedAbsorbs:OnDisable()
-	Recount:UnregisterEvent("COMBAT_LOG_EVENT_UNFILTERED")
+	RecountGuessedAbsorbs:UnregisterEvent("COMBAT_LOG_EVENT_UNFILTERED")
 end
 
 --[[
@@ -517,7 +525,7 @@ function RecountGuessedAbsorbs:DataModesGuessedAbsorbs(data, num)
 	if num==1 then
 		return (data.Fights[Recount.db.profile.CurDataSet].GuessedAbsorbs or 0), (data.Fights[Recount.db.profile.CurDataSet].GuessedAbsorbs or 0)/((data.Fights[Recount.db.profile.CurDataSet].ActiveTime or 0) + Epsilon)
 	else
-		return (data.Fights[Recount.db.profile.CurDataSet].GuessedAbsorbs or 0), {{data.Fights[Recount.db.profile.CurDataSet].GuessedAbsorbed,L["'s Guessed Absorbs"],DetailTitles.GuessedAbsorbed},{data.Fights[Recount.db.profile.CurDataSet].ShieldedWho," "..L["Shielded Who"],DetailTitles.ShieldedWho},{data.Fights[Recount.db.profile.CurDataSet].ShieldDamagedBy," "..RL["Took Damage From"],DetailTitles.ShieldDamagedBy}}
+		return (data.Fights[Recount.db.profile.CurDataSet].GuessedAbsorbs or 0), {{data.Fights[Recount.db.profile.CurDataSet].GuessedAbsorbed,L["'s Guessed Absorbs"],DetailTitles.GuessedAbsorbed},{data.Fights[Recount.db.profile.CurDataSet].GuessedShieldedWho," "..L["Shielded Who"],DetailTitles.ShieldedWho},{data.Fights[Recount.db.profile.CurDataSet].ShieldDamagedBy," "..RL["Took Damage From"],DetailTitles.ShieldDamagedBy}}
 	end
 end
 
@@ -534,7 +542,7 @@ function RecountGuessedAbsorbs:TooltipFuncsGuessedAbsorbs(name,data)
 --	if name and Recount.db2.combatants[name].enClass == "HOSTILE" or Recount.db2.combatants[name].enClass == "MOB" then
 --		Recount:AddSortedTooltipData(RL["Top 3"].." "..L["Took Damage From"],data and data.Fights[Recount.db.profile.CurDataSet] and data.Fights[Recount.db.profile.CurDataSet].DamagedBy,3)
 --	else
-		Recount:AddSortedTooltipData(RL["Top 3"].." "..L["Shielded"],data and data.Fights[Recount.db.profile.CurDataSet] and data.Fights[Recount.db.profile.CurDataSet].ShieldedWho,3)
+		Recount:AddSortedTooltipData(RL["Top 3"].." "..L["Shielded"],data and data.Fights[Recount.db.profile.CurDataSet] and data.Fights[Recount.db.profile.CurDataSet].GuessedShieldedWho,3)
 --	end
 	GameTooltip:AddLine("<"..RL["Click for more Details"]..">",0,0.9,0)
 end
